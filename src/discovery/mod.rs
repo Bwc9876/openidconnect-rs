@@ -380,7 +380,7 @@ where
         .map_err(DiscoveryError::Parse)?;
 
         // LTI "relaxes" the checks here: https://www.imsglobal.org/spec/lti-dr/v1p0#step-2-discovery-and-openid-configuration
-        if issuer_url.starts_with(&provider_metadata.issuer().to_string()) {
+        if !issuer_url.starts_with(&provider_metadata.issuer().to_string()) {
             Err(DiscoveryError::Validation(format!(
                 "unexpected issuer URI `{}` (expected `{}`)",
                 provider_metadata.issuer().as_str(),
