@@ -281,9 +281,8 @@ where
     where
         C: SyncHttpClient,
     {
-        let discovery_url = issuer_url
-            .join(CONFIG_URL_SUFFIX)
-            .map_err(DiscoveryError::UrlParse)?;
+        // LTI Breaks Spec: https://www.imsglobal.org/spec/lti-dr/v1p0#step-2-discovery-and-openid-configuration
+        let discovery_url = issuer_url.url().clone();
 
         http_client
             .call(
@@ -380,7 +379,8 @@ where
         )
         .map_err(DiscoveryError::Parse)?;
 
-        if provider_metadata.issuer() != issuer_url {
+        // LTI "relaxes" the checks here: https://www.imsglobal.org/spec/lti-dr/v1p0#step-2-discovery-and-openid-configuration
+        if issuer_url.starts_with(&provider_metadata.issuer().to_string()) {
             Err(DiscoveryError::Validation(format!(
                 "unexpected issuer URI `{}` (expected `{}`)",
                 provider_metadata.issuer().as_str(),
