@@ -624,9 +624,9 @@ where
         // Spec says that a successful response SHOULD use 201 Created, and a registration error
         // condition returns (no "SHOULD") 400 Bad Request. For now, only accept these two status
         // codes. We may need to relax the success status to improve interoperability.
-        if http_response.status() != StatusCode::CREATED
-            && http_response.status() != StatusCode::BAD_REQUEST
-        {
+        //
+        // For LTI: Moodle returns a 200 and the LTI spec doesn't specify.
+        if !http_response.status().is_success() {
             return Err(ClientRegistrationError::Response(
                 http_response.status(),
                 http_response.body().to_owned(),

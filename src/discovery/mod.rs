@@ -22,8 +22,6 @@ use std::future::Future;
 #[cfg(test)]
 mod tests;
 
-const CONFIG_URL_SUFFIX: &str = ".well-known/openid-configuration";
-
 /// Trait for adding extra fields to [`ProviderMetadata`].
 pub trait AdditionalProviderMetadata: Clone + Debug + DeserializeOwned + Serialize {}
 
@@ -313,20 +311,16 @@ where
         C: AsyncHttpClient<'c>,
     {
         Box::pin(async move {
-            let discovery_url = issuer_url
-                .join(CONFIG_URL_SUFFIX)
-                .map_err(DiscoveryError::UrlParse)?;
-
             let provider_metadata = http_client
                 .call(
-                    Self::discovery_request(discovery_url.clone()).map_err(|err| {
+                    Self::discovery_request(issuer_url.url().clone()).map_err(|err| {
                         DiscoveryError::Other(format!("failed to prepare request: {err}"))
                     })?,
                 )
                 .await
                 .map_err(DiscoveryError::Request)
                 .and_then(|http_response| {
-                    Self::discovery_response(&issuer_url, &discovery_url, http_response)
+                    Self::discovery_response(&issuer_url, issuer_url.url(), http_response)
                 })?;
 
             JsonWebKeySet::fetch_async(provider_metadata.jwks_uri(), http_client)
