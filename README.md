@@ -30,6 +30,9 @@ these changes may be upstreamed as a new feature.
 3. `src/registration/mod.rs`: Relaxes status code checks on registration
    endpoint. LTI spec doesn't say which code to use and Moodle gives back a 200
    (OIDC says 201).
+4. `src/discovery/mod.rs`: Change `discover` and `discover_async` to allow
+   passing a registration token. The LTI spec doesn't require this but Canvas
+   does.
 
 ## Minimum Supported Rust Version (MSRV)
 

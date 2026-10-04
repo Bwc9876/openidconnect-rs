@@ -1,4 +1,4 @@
-use crate::http_utils::{check_content_type, MIME_TYPE_JSON};
+use crate::http_utils::{auth_bearer, check_content_type, MIME_TYPE_JSON};
 use crate::{
     AsyncHttpClient, AuthDisplay, AuthUrl, AuthenticationContextClass, ClaimName, ClaimType,
     ClientAuthMethod, GrantType, HttpRequest, HttpResponse, IssuerUrl, JsonWebKey, JsonWebKeySet,
@@ -11,6 +11,7 @@ use crate::{
 use http::header::{HeaderValue, ACCEPT};
 use http::method::Method;
 use http::status::StatusCode;
+use oauth2::AccessToken;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, skip_serializing_none, VecSkipError};
@@ -274,6 +275,7 @@ where
     /// OpenID Connect Provider.
     pub fn discover<C>(
         issuer_url: &IssuerUrl,
+        auth_token: &Option<AccessToken>,
         http_client: &C,
     ) -> Result<Self, DiscoveryError<<C as SyncHttpClient>::Error>>
     where
@@ -284,7 +286,7 @@ where
 
         http_client
             .call(
-                Self::discovery_request(discovery_url.clone()).map_err(|err| {
+                Self::discovery_request(discovery_url.clone(), auth_token).map_err(|err| {
                     DiscoveryError::Other(format!("failed to prepare request: {err}"))
                 })?,
             )
@@ -304,6 +306,7 @@ where
     /// from the OpenID Connect Provider.
     pub fn discover_async<'c, C>(
         issuer_url: IssuerUrl,
+        auth_token: &'c Option<AccessToken>,
         http_client: &'c C,
     ) -> impl Future<Output = Result<Self, DiscoveryError<<C as AsyncHttpClient<'c>>::Error>>> + 'c
     where
@@ -313,9 +316,9 @@ where
         Box::pin(async move {
             let provider_metadata = http_client
                 .call(
-                    Self::discovery_request(issuer_url.url().clone()).map_err(|err| {
-                        DiscoveryError::Other(format!("failed to prepare request: {err}"))
-                    })?,
+                    Self::discovery_request(issuer_url.url().clone(), auth_token).map_err(
+                        |err| DiscoveryError::Other(format!("failed to prepare request: {err}")),
+                    )?,
                 )
                 .await
                 .map_err(DiscoveryError::Request)
@@ -332,12 +335,22 @@ where
         })
     }
 
-    fn discovery_request(discovery_url: url::Url) -> Result<HttpRequest, http::Error> {
-        http::Request::builder()
+    fn discovery_request(
+        discovery_url: url::Url,
+        auth_token: &Option<AccessToken>,
+    ) -> Result<HttpRequest, http::Error> {
+        let auth_header_opt = auth_token.as_ref().map(auth_bearer);
+
+        let mut request = http::Request::builder()
             .uri(discovery_url.to_string())
             .method(Method::GET)
-            .header(ACCEPT, HeaderValue::from_static(MIME_TYPE_JSON))
-            .body(Vec::new())
+            .header(ACCEPT, HeaderValue::from_static(MIME_TYPE_JSON));
+
+        if let Some((header, value)) = auth_header_opt {
+            request = request.header(header, value);
+        }
+
+        request.body(Vec::new())
     }
 
     fn discovery_response<RE>(
